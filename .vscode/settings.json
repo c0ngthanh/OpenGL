@@ -1,5 +1,10 @@
 {
     "files.associations": {
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "cmath": "cpp",
+        "iostream": "cpp",
+        "string": "cpp",
+        "random": "cpp",
+        "limits": "cpp"
     }
 }
