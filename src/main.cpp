@@ -1,3 +1,6 @@
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/imgui_impl_opengl3.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #define STB_IMAGE_IMPLEMENTATION
@@ -13,6 +16,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void processInput(GLFWwindow *window);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void ImGuiInit(GLFWwindow *window);
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -26,8 +30,10 @@ bool firstMouse = true;
 float deltaTime = 0.0f;	// Time between current frame and last frame
 float lastFrame = 0.0f; // Time of last frame
 
+bool updateMouse = true;
 // Light Source pos
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec3 lightPos(5, 0, 5);
+glm::vec3 lightPos2(5, 0, 5);
 int main()
 {
 
@@ -146,8 +152,34 @@ int main()
     // lightingShader.setVec3("lightPos",lightPos);
    // render loop
     // -----------
+    glm::vec3 cubePositions[] = {
+    glm::vec3( 0.0f,  0.0f,  0.0f), 
+    glm::vec3( 2.0f,  5.0f, -15.0f), 
+    glm::vec3(-1.5f, -2.2f, -2.5f),  
+    glm::vec3(-3.8f, -2.0f, -12.3f),  
+    glm::vec3( 2.4f, -0.4f, -3.5f),  
+    glm::vec3(-1.7f,  3.0f, -7.5f),  
+    glm::vec3( 1.3f, -2.0f, -2.5f),  
+    glm::vec3( 1.5f,  2.0f, -2.5f), 
+    glm::vec3( 1.5f,  0.2f, -1.5f), 
+    glm::vec3(-1.3f,  1.0f, -1.5f) 
+    }; 
+    ImGuiInit(window);
+    // ImGui Variable
+    float color[4] = {1.0,1.0,1.0,1.0};
+    float color2[4] = {1.0,1.0,1.0,1.0};
     while (!glfwWindowShouldClose(window))
     {
+        //ImGUI
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::Begin("IMGUI Window");
+        ImGui::Text("Editor");
+        ImGui::ColorEdit4("Light Color:",color);
+        ImGui::ColorEdit4("Light Color2:",color2);
+        ImGui::End();
+        
         // per-frame time logic
         // --------------------
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -162,46 +194,93 @@ int main()
         // ------
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
+        lightPos = glm::vec3(
+            cos(glfwGetTime()*2) * 8.0f, 
+            0, 
+            sin(glfwGetTime()*2) * 8.0f);
+        lightPos2 = glm::vec3(
+            0, 
+            cos(glfwGetTime()*4) * 8.0f, 
+            sin(glfwGetTime()*4) * 8.0f);
         // be sure to activate shader when setting uniforms/drawing objects
         lightingShader.use();
-        lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
-        lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
+        lightingShader.setVec3("objectColor", 0.313f, 0.784f, 0.47f);
+        lightingShader.setVec3("lightColor",  color[0],color[1],color[2]);
+        lightingShader.setVec3("lightColor2",  color2[0],color2[1],color2[2]);
         lightingShader.setVec3("lightPos",lightPos);
-
+        lightingShader.setVec3("lightPos2",lightPos2);
+        lightingShader.setVec3("viewPos", camera.Position); 
+        //Set material
+        // lightingShader.setVec3("material.ambient", 0.0215f, 0.1745f, 0.0215f);
+        // lightingShader.setVec3("material.diffuse", 0.07568f, 0.61424f, 0.07568f);
+        lightingShader.setVec3("material.specular", 0.633f, 0.727811f, 0.633f);
+        lightingShader.setFloat("material.shininess", 76.8f);
+        lightingShader.setVec3("light.ambient", 0.0215f, 0.1745f, 0.0215f);
+        lightingShader.setVec3("light.diffuse", 0.07568f, 0.61424f, 0.07568f); // darken diffuse light a bit
+        lightingShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("view", view);
-
-        // world transformation
-        glm::mat4 model = glm::mat4(1.0f);
-        lightingShader.setMat4("model", model);
-
+        
+        
+    
         // render the cube
         glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        for (unsigned int i = 0; i < 10; i++)
+        {
+            // world transformation
+            // calculate the model matrix for each object and pass it to shader before drawing
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePositions[i]);
+            if(i%3==0){
+                float angle = (20.0f + i*5) * (float)glfwGetTime();
+                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f+i, 0.3f+i, 0.5f+i));
+            }
+           lightingShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+        // glDrawArrays(GL_TRIANGLES, 0, 36);
 
 
         // also draw the lamp object
         lightCubeShader.use();
         lightCubeShader.setMat4("projection", projection);
         lightCubeShader.setMat4("view", view);
-        model = glm::mat4(1.0f);
+        glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, lightPos);
-        model = glm::scale(model, glm::vec3(0.2f)); // a smaller cube
+        // model = glm::translate(model,lightPos);
+        model = glm::scale(model, glm::vec3(1.5f)); // a smaller cube
         lightCubeShader.setMat4("model", model);
+        lightCubeShader.setVec3("lightColor",  color[0],color[1],color[2]);
 
         glBindVertexArray(lightCubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
+        
+        glm::mat4 model2 = glm::mat4(1.0f);
+        model2 = glm::translate(model2, lightPos2);
+        // model = glm::translate(model,lightPos);
+        model2 = glm::scale(model2, glm::vec3(1.5f)); // a smaller cube
+        lightCubeShader.setMat4("model", model2);
+        lightCubeShader.setVec3("lightColor",  color2[0],color2[1],color2[2]);
 
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        //
+        
 
+        //Render ImGui
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+    //IMGUI shutdown
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
@@ -217,6 +296,9 @@ int main()
 }
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 {
+    if(!updateMouse){
+        return;
+    }
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
@@ -240,7 +322,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------\
+
+bool isAltPressed = false;
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -256,6 +340,17 @@ void processInput(GLFWwindow *window)
         if(offset<=0){
             offset=0;
         }
+    }
+    if(glfwGetKey(window,GLFW_KEY_LEFT_ALT) == GLFW_PRESS){
+        isAltPressed = true;
+        updateMouse = false;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+    if(glfwGetKey(window,GLFW_KEY_LEFT_ALT) == GLFW_RELEASE && isAltPressed){
+        isAltPressed = false;
+        firstMouse=true;
+        updateMouse = true;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
     // const float cameraSpeed = 2.5 * deltaTime; // adjust accordingly
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -275,4 +370,12 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     // make sure the viewport matches the new window dimensions; note that width and 
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
+}
+void ImGuiInit(GLFWwindow *window){
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window,true);
+    ImGui_ImplOpenGL3_Init("#version 330");
 }

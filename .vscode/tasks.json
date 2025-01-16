@@ -12,7 +12,10 @@
                 "-L${workspaceFolder}\\lib",
                 "${workspaceFolder}\\src\\main.cpp",
                 "${workspaceFolder}\\src\\glad.c",
+                "${workspaceFolder}\\include\\imgui\\*.h",
+                "${workspaceFolder}\\include\\imgui\\*.cpp",
                 "-lglfw3dll",
+                "-lopengl32",
                 "-o",
                 "${workspaceFolder}\\cutable.exe"
             ],
